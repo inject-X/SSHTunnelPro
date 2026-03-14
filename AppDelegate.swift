@@ -4,15 +4,16 @@ import SwiftUI
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     var mainWindow: NSWindow!
+    private var settingsWindow: NSWindow?
     let tunnelManager = TunnelManager()
     var statusBarController: StatusBarController?
     private var settingsCancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let settings = AppSettings.shared
+        // Always show in Dock
+        NSApp.setActivationPolicy(.regular)
 
-        // Apply saved Dock visibility
-        settings.applyActivationPolicy()
+        let settings = AppSettings.shared
 
         let contentView = ContentView()
             .environmentObject(tunnelManager)
@@ -34,7 +35,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.showMainWindow()
         }
 
-        // Show/hide menu bar icon based on settings
         if !settings.showInMenuBar {
             statusBarController?.setVisible(false)
         }
@@ -50,8 +50,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        // Keep running in menu bar even when window is closed
         return false
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag { showMainWindow() }
+        return true
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -135,19 +139,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func showSettings() {
-        let settingsView = SettingsView()
-        let hostingView = NSHostingView(rootView: settingsView)
-        let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 480, height: 360),
-            styleMask: [.titled, .closable, .fullSizeContentView],
-            backing: .buffered,
-            defer: false
-        )
-        panel.title = String(localized: "Settings")
-        panel.contentView = hostingView
-        panel.center()
-        panel.isFloatingPanel = true
-        panel.makeKeyAndOrderFront(nil)
+        if settingsWindow == nil {
+            let win = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 480, height: 360),
+                styleMask: [.titled, .closable, .fullSizeContentView],
+                backing: .buffered,
+                defer: false
+            )
+            win.title = String(localized: "Settings")
+            win.contentView = NSHostingView(rootView: SettingsView())
+            win.isReleasedWhenClosed = false
+            win.center()
+            settingsWindow = win
+        }
+        settingsWindow?.makeKeyAndOrderFront(nil)
         if #available(macOS 14.0, *) {
             NSApp.activate()
         } else {

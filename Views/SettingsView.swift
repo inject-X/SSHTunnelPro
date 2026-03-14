@@ -21,31 +21,11 @@ struct SettingsView: View {
                     // MARK: – Appearance
                     settingsSection(String(localized: "Appearance")) {
                         settingsToggle(
-                            String(localized: "Show in Dock"),
-                            subtitle: String(localized: "When off, the app only appears in the menu bar"),
-                            icon: "dock.rectangle",
-                            isOn: $settings.showInDock
-                        )
-                        .onChange(of: settings.showInDock) { newVal in
-                            // Must keep at least one visible
-                            if !newVal && !settings.showInMenuBar {
-                                settings.showInMenuBar = true
-                            }
-                        }
-
-                        Divider().padding(.leading, 36)
-
-                        settingsToggle(
                             String(localized: "Show in Menu Bar"),
                             subtitle: String(localized: "Show status icon and quick menu in menu bar"),
                             icon: "menubar.rectangle",
                             isOn: $settings.showInMenuBar
                         )
-                        .onChange(of: settings.showInMenuBar) { newVal in
-                            if !newVal && !settings.showInDock {
-                                settings.showInDock = true
-                            }
-                        }
                     }
 
                     // MARK: – General
@@ -97,11 +77,39 @@ struct SettingsView: View {
                 }
             }
             Spacer()
-            Toggle("", isOn: isOn)
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                .labelsHidden()
+            NSSwitchView(isOn: isOn)
         }
         .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .onTapGesture { isOn.wrappedValue.toggle() }
+    }
+}
+
+/// NSSwitch wrapped in NSViewRepresentable so we can set focusRingType = .none,
+/// eliminating the focus ring that SwiftUI's Toggle always renders on macOS.
+private struct NSSwitchView: NSViewRepresentable {
+    @Binding var isOn: Bool
+
+    func makeNSView(context: Context) -> NSSwitch {
+        let s = NSSwitch()
+        s.focusRingType = .none
+        s.controlSize = .small
+        s.target = context.coordinator
+        s.action = #selector(Coordinator.valueChanged(_:))
+        return s
+    }
+
+    func updateNSView(_ nsView: NSSwitch, context: Context) {
+        nsView.state = isOn ? .on : .off
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(isOn: $isOn) }
+
+    final class Coordinator: NSObject {
+        var isOn: Binding<Bool>
+        init(isOn: Binding<Bool>) { self.isOn = isOn }
+        @objc func valueChanged(_ sender: NSSwitch) {
+            isOn.wrappedValue = sender.state == .on
+        }
     }
 }
